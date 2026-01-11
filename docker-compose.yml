@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  postgres-age:
+    image: apache/age
+    container_name: age-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-age_db}
+    ports:
+      - "${POSTGRES_PORT:-5455}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - age-network
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: age-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres-age
+    networks:
+      - age-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  age-network:
+    driver: bridge

@@ -1,0 +1,110 @@
+import { initializeAGE, createGraph, executeGraphQuery, listGraphs, pool } from './database';
+
+async function main() {
+  try {
+    console.log('=== Apache AGE Graph Database Example ===\n');
+
+    // Initialize Apache AGE extension
+    console.log('1. Initializing Apache AGE extension...');
+    await initializeAGE();
+    console.log('   ✓ AGE initialized\n');
+
+    // Create a test graph
+    const graphName = 'test_graph';
+    console.log(`2. Creating graph: ${graphName}...`);
+    await createGraph(graphName);
+    console.log('   ✓ Graph created\n');
+
+    // Create some nodes
+    console.log('3. Creating nodes (Person entities)...');
+    await executeGraphQuery(
+      graphName,
+      `CREATE (:Person {name: 'Alice', age: 30, occupation: 'Engineer'}),
+              (:Person {name: 'Bob', age: 28, occupation: 'Designer'}),
+              (:Person {name: 'Charlie', age: 32, occupation: 'Manager'})`,
+      'result agtype'
+    );
+    console.log('   ✓ Nodes created\n');
+
+    // Create relationships
+    console.log('4. Creating relationships (KNOWS)...');
+    await executeGraphQuery(
+      graphName,
+      `MATCH (a:Person {name: 'Alice'}), (b:Person {name: 'Bob'})
+       CREATE (a)-[:KNOWS {since: 2020}]->(b)`,
+      'result agtype'
+    );
+    await executeGraphQuery(
+      graphName,
+      `MATCH (b:Person {name: 'Bob'}), (c:Person {name: 'Charlie'})
+       CREATE (b)-[:KNOWS {since: 2019}]->(c)`,
+      'result agtype'
+    );
+    console.log('   ✓ Relationships created\n');
+
+    // Query all persons
+    console.log('5. Querying all persons...');
+    const persons = await executeGraphQuery(
+      graphName,
+      `MATCH (p:Person)
+       RETURN p.name AS name, p.age AS age, p.occupation AS occupation
+       ORDER BY p.name`,
+      'name agtype, age agtype, occupation agtype'
+    );
+    console.log('   Results:');
+    persons.forEach(person => {
+      console.log(`   - ${person.name}: ${person.age} years old, ${person.occupation}`);
+    });
+    console.log();
+
+    // Find connections
+    console.log('6. Finding who Alice knows...');
+    const connections = await executeGraphQuery(
+      graphName,
+      `MATCH (a:Person {name: 'Alice'})-[r:KNOWS]->(b:Person)
+       RETURN a.name AS from, b.name AS to, r.since AS since`,
+      'from agtype, to agtype, since agtype'
+    );
+    console.log('   Results:');
+    connections.forEach(conn => {
+      console.log(`   - ${conn.from} knows ${conn.to} since ${conn.since}`);
+    });
+    console.log();
+
+    // Find paths (2 degrees of separation)
+    console.log('7. Finding paths from Alice (2 degrees)...');
+    const paths = await executeGraphQuery(
+      graphName,
+      `MATCH path = (a:Person {name: 'Alice'})-[:KNOWS*1..2]->(others:Person)
+       RETURN others.name AS reachable`,
+      'reachable agtype'
+    );
+    console.log('   People Alice can reach:');
+    paths.forEach(p => {
+      console.log(`   - ${p.reachable}`);
+    });
+    console.log();
+
+    // List all graphs
+    console.log('8. Listing all graphs in database...');
+    const graphs = await listGraphs();
+    console.log('   Available graphs:');
+    graphs.forEach(g => console.log(`   - ${g}`));
+    console.log();
+
+    console.log('=== Example completed successfully! ===\n');
+    console.log('To clean up the test graph, you can use dropGraph() function.');
+    console.log('Access pgAdmin at http://localhost:5050 to explore the database visually.\n');
+
+  } catch (error) {
+    console.error('Error running example:', error);
+    process.exit(1);
+  } finally {
+    // Close the database pool
+    await pool.end();
+    console.log('Database connection closed.');
+  }
+}
+
+// Run the main function
+main();
